@@ -28,11 +28,11 @@
 # SweepMe! device class
 # Type: Logger
 # Device: Fluke 8842A
-# Maintainer: Gennaro Tortone
 
 import time
 from EmptyDeviceClass import EmptyDevice
 from ErrorMessage import debug
+
 
 class Device(EmptyDevice):
 
@@ -51,97 +51,93 @@ class Device(EmptyDevice):
             "DC voltage":  {
                 "command": "F1",
                 "variable": "DC voltage",
-                "unit": "V"
+                "unit": "V",
             },
             "AC voltage":  {
                 "command": "F2",
                 "variable": "AC voltage",
-                "unit": "V"
+                "unit": "V",
             },
             "2-wire resistance":    {
                 "command": "F3",
                 "variable": "Resistance",
-                "unit": "ohm"
+                "unit": "Ohm",
             },
             "4-wire resistance":     {
                 "command": "F4",
                 "variable": "Resistance",
-                "unit": "ohm"
+                "unit": "Ohm",
             },
             "DC current":   {
                 "command": "F5",
                 "variable": "DC current",
-                "unit": "A"
+                "unit": "A",
             },
             "AC current":   {
                 "command": "F6",
                 "variable": "AC current",
-                "unit": "A"
+                "unit": "A",
             }
         }
 
         self.measurement_ranges = {
             "Autorange ON": {
-                "command": "R0"
+                "command": "R0",
             },
-            "200 mV, 200 ohm": {
-                "command": "R1"
+            "200 mV, 200 Ohm": {
+                "command": "R1",
             },
-            "2 V, 2 kohm": {
-                "command": "R2"
+            "2 V, 2 kOhm": {
+                "command": "R2",
             },
-            "20 V, 20 kohm": {
-                "command": "R3"
+            "20 V, 20 kOhm": {
+                "command": "R3",
             },
-            "200 V, 200 kohm, 200 mA": {
-                "command": "R4"
+            "200 V, 200 kOhm, 200 mA": {
+                "command": "R4",
             },
-            "1000 V DC, 700 V AC, 2 Mohm, 2000 mA": {
-                "command": "R5"
+            "1000 V DC, 700 V AC, 2 MOhm, 2000 mA": {
+                "command": "R5",
             },
-            "20 mohm": {
-                "command": "R6"
+            "20 MOhm": {
+                "command": "R6",
             },
-            "Autorange OFF": {
-                "command": "R7"
-            },
-            "20 mV, 20 ohm": {
-                "command": "R8"
+            "20 mV, 20 Ohm": {
+                "command": "R8",
             },
         }
 
         self.sampling_rates = {
             "Fast": {
-                "command": "S2"
+                "command": "S2",
             },
             "Medium": {
-                "command": "S1"
+                "command": "S1",
             },
             "Slow": {
-                "command": "S0"
+                "command": "S0",
             }
         }
 
         self.trigger_modes = {
-            "Autotrigger": {
-                "command": "T0"
+            "Auto":{
+                "command": "T0",
             },
-            "Rear EXTTRIG input with settling delay" : {
-                "command": "T1"
+            "External with settling delay": {
+                "command": "T1",
             },
-            "Rear EXTTRIG input, no settling delay" : {
-                "command": "T3"
+            "External without settling delay": {
+                "command": "T3",
             }
         }
 
-        self.idlevalue = 0.0
+        # Time until external trigger must happen
         self.triggertimeout = 30
 
         self.port_manager = True
         self.port_types = ['GPIB']
         self.port_properties = {
             "timeout": 5,
-            # "delay": 0.1,
         }
 
     def set_GUIparameter(self):
@@ -195,24 +191,24 @@ class Device(EmptyDevice):
     def read_result(self):
         dataavail = True
         stb = self.port.port.read_stb()
-        if self.triggermode != "Autotrigger":
+        if self.triggermode != "Auto":
             telapsed = 0
             dataavail = False
-            while (telapsed < self.triggertimeout):
+            while telapsed < self.triggertimeout:
                 stb = self.port.port.read_stb()
-                if stb & (1<<5):
+                if stb & (1 << 5):
                     dataavail = True
                     break
                 time.sleep(0.5)
                 telapsed += 0.5
 
-        if(dataavail):        
+        if dataavail:
             answer = self.port.read()
             value, label = answer.split(',')
             self.val = float(value)
-            self.overrange = stb & (1)
+            self.overrange = stb & 1
         else:
-            self.stopMeasurement = "trigger timeout"
+            raise Exception("Trigger timeout")
 
     def call(self):
         return [self.val, self.overrange]
