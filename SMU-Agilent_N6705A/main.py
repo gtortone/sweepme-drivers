@@ -99,6 +99,7 @@ class Device(EmptyDevice):
             "Range": list(self.current_ranges.keys()),
             "RangeVoltage": list(self.voltage_ranges.keys()),
             "Compliance": 100e-6,
+            "4wire": False,
             "Average": 1
         }
 
@@ -110,6 +111,7 @@ class Device(EmptyDevice):
         self.vrange = self.voltage_ranges[parameter["RangeVoltage"]]
         self.irange = self.current_ranges[parameter["Range"]]
         self.average = parameter["Average"]
+        self.four_wires = parameter["4wire"]
 
         self.device = parameter['Device']
         self.channel = self.device[-1]
@@ -126,6 +128,12 @@ class Device(EmptyDevice):
         self.channel_model = self.port.read()
 
         if self.source == "Voltage [V]":
+            # 4 wires
+            debug(self.four_wires)
+            if self.four_wires:
+                self.port.write(f"VOLT:SENSE:SOURCE EXT, (@{self.channel})")
+            else:
+                self.port.write(f"VOLT:SENSE:SOURCE INT, (@{self.channel})")
             # sourcemode fix
             self.port.write(f"VOLT:MODE FIX, (@{self.channel})")
             # compliance
