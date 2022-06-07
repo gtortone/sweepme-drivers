@@ -30,6 +30,7 @@
 # Device: NFCorporation CA5351
 
 import time
+from collections import OrderedDict
 from EmptyDeviceClass import EmptyDevice
 from ErrorMessage import debug
 
@@ -37,7 +38,7 @@ class Device(EmptyDevice):
 
     description =   """
 <style>
-    table, th, td { border:1px solid black; padding: 2px}
+    table, th, td { border:1px solid black; padding: 2px1}
 </style>
 <h3>NF Corporation CA5351 - current amplifier</h3>
 <div>
@@ -85,6 +86,13 @@ class Device(EmptyDevice):
         </tr>
     </tbody>
 </table>
+<div>
+<br>
+<strong>Filter: </strong>
+Setting the filter to OFF (not use) will disable noise rejection, but response properties
+will become the fastest. When the fastest response is required, turn off the filter
+function.
+</div>
 </div>
                     """
 
@@ -102,32 +110,32 @@ class Device(EmptyDevice):
             "rear": "REAR"
         }
 
-        self.cs_ranges = {          # current suppression (CS) range
-            "auto": 0,
-            "8 nA": 1,
-            "80 nA": 2,
-            "800 nA": 3,
-            "8 uA": 4,
-            "80 uA": 5,
-            "800 uA": 6,
-            "8 mA": 7          
-        }
+        self.cs_ranges = OrderedDict([          # current suppression (CS) range
+            ("auto", 0),
+            ("8 nA", 8E-9),
+            ("80 nA", 80E-9),
+            ("800 nA", 800E-9),
+            ("8 μA", 8E-6),
+            ("80 μA", 80E-6),
+            ("800 μA", 800E-6),
+            ("8 mA", 8E-3)
+        ])
 
-        self.filter_rtimes = {      # filter rise time
-            "auto": 0,
-            "1 us": 1,
-            "3 us": 2,
-            "10 us": 3,
-            "30 us": 4,
-            "100 us": 5,
-            "300 us": 6,
-            "1 ms": 7,
-            "3 ms": 8,
-            "10 ms": 9,
-            "30 ms": 10,
-            "100 ms": 11,
-            "300 ms": 12
-        }
+        self.filter_rtimes = OrderedDict([      # filter rise time
+            ("auto", 0),
+            ("1 us", 1E-6),
+            ("3 μs", 3E-6),
+            ("10 μs", 10E-6),
+            ("30 μs", 30E-6),
+            ("100 μs", 100E-6),
+            ("300 μs", 300E-6),
+            ("1 ms", 1E-3),
+            ("3 ms", 3E-3),
+            ("10 ms", 10E-3),
+            ("30 ms", 30E-3),
+            ("100 ms", 100E-3),
+            ("300 ms", 300E-3)
+        ])
 
         self.gains = {
             "1E03": 1,
@@ -149,12 +157,13 @@ class Device(EmptyDevice):
             "Input:": None,
             "Terminals" : list(self.inputs.keys()),
             "Zero check": False,
+            "Amplification": None,
+            "I/V Gain": list(self.gains.keys()),
             "Current suppression:" : None,
             "Use current suppression": False,
             "Auto settings": False,
             "Current in A": 0.0,
             "Range": list(self.cs_ranges.keys()),
-            "I/V Gain": list(self.gains.keys()),
             "Filter:": None,
             "Use filter": False,
             "Rise time": list(self.filter_rtimes.keys()),
@@ -174,17 +183,28 @@ class Device(EmptyDevice):
         self.filter_enable = parameter["Use filter"]
         self.filter_rtime = parameter["Rise time"]
 
-        if self.cs_enable:
-            self.variables = ["Current suppression"]
-            self.units = ["A"]
-            self.plottype = [True]
-            self.savetype = [True]
-        else:
-            self.variables = []
-            self.units = []
-            self.plottype = []
-            self.savetype = []
+        self.variables = []
+        self.units = []
+        self.plottype = []
+        self.savetype = []
 
+        if self.cs_enable and self.cs_range == "auto":
+            self.variables.append("Current suppression")
+            self.units.append("A")
+            self.plottype.append(True)
+            self.savetype.append(True)
+
+            self.variables.append("Range")
+            self.units.append("A")
+            self.plottype.append(True)
+            self.savetype.append(True)
+
+        if self.filter_enable and self.filter_rtime == "auto":
+            self.variables.append("Filter rise time")
+            self.units.append("s")
+            self.plottype.append(True)
+            self.savetype.append(True)
+        
     def initialize(self):
         self.port.port.read_termination = '\n'
         self.port.port.write_termination = '\n'
@@ -212,7 +232,7 @@ class Device(EmptyDevice):
                 if self.cs_range == "auto":
                     self.port.write(":INPUT:BIAS:CURRENT:RANGE:AUTO ON")
                 else:
-                    self.port.write(f":INPUT:BIAS:CURRENT:RANGE {self.cs_ranges[self.cs_range]}")
+                    self.port.write(f":INPUT:BIAS:CURRENT:RANGE {list(self.cs_ranges.keys()).index(self.cs_range)}")
                 # set CS level
                 self.port.write(f":INPUT:BIAS:CURRENT {self.cs_value}")
             else:
@@ -233,7 +253,7 @@ class Device(EmptyDevice):
             esr = self.read_esr()
 
             if (esr & (1<<4)):
-                raise Exception("execution error")
+                raise Exception("execution error during current suppression setup - verify CS value and range")
 
             # enable CS
             self.port.write(":INPUT:BIAS:CURRENT:STATE ON")
@@ -246,16 +266,21 @@ class Device(EmptyDevice):
             if self.filter_rtime == "auto":
                 self.port.write(":INPUT:FILTER:TIME:AUTO ON")
             else:
-                self.port.write(f":INPUT:FILTER:TIME {self.filter_rtimes[self.filter_rtime]}")
+                self.port.write(f":INPUT:FILTER:TIME {list(self.filter_rtimes.keys()).index(self.filter_rtime)}")
 
             self.port.write(":INPUT:FILTER:STATE ON")
 
     def call(self):
-        if self.cs_enable:
-            current = float(self.port.port.query(":INPUT:BIAS:CURRENT?"))
-            return [current]
-        else:
-            return []
+        retarr = []
+        if (self.cs_enable and self.cs_range == "auto"):
+            retarr.append(float(self.port.port.query(":INPUT:BIAS:CURRENT?")))
+            id = int(self.port.port.query(":INPUT:BIAS:CURRENT:RANGE?"))
+            retarr.append(list(self.cs_ranges.items())[id][1])
+        if self.filter_enable and self.filter_rtime == "auto":
+            id = int(self.port.port.query(":INPUT:FILTER:TIME?"))
+            retarr.append(list(self.filter_rtimes.items())[id][1])
+            
+        return retarr
 
     # check ESR (standard event status register)
     def read_esr(self):
