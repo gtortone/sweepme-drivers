@@ -187,7 +187,7 @@ class Device(EmptyDevice):
 
         # modules N6761A and N6762A have simultaneous V/I measurement
         if self.channel_model.startswith('N676'):
-            self.port.write(f"FETCH:CURR? (@{self.channel})")
+            self.port.write(f"FETCH:ARR:CURR? (@{self.channel})")
         else:
             self.port.write(f"MEAS:ARR:CURR? (@{self.channel})")
 
