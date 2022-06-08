@@ -31,6 +31,7 @@
 
 import time
 from EmptyDeviceClass import EmptyDevice
+from Ports import GPIBport
 from ErrorMessage import debug
 
 
@@ -139,7 +140,7 @@ class Device(EmptyDevice):
         self.port_properties = {
             "timeout": 5,
         }
-
+        
     def set_GUIparameter(self):
 
         GUIparameter = {
@@ -163,6 +164,12 @@ class Device(EmptyDevice):
         self.units = [self.measurement_modes[self.mode]["unit"], 'bool']
         self.plottype = [True, False]
         self.savetype = [True, True]
+
+    # monkey patching close_internal method due to instrument reset on clear()
+    def connect(self):
+        def custom_close_internal(obj):
+            obj.port.close()
+        GPIBport.close_internal = custom_close_internal
 
     def initialize(self):
 
