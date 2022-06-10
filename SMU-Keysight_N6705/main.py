@@ -27,7 +27,7 @@
 
 # SweepMe! device class
 # Type: SMU
-# Device: Agilent N6705A
+# Device: Keysight N6705
 
 import numpy as np
 from collections import OrderedDict
@@ -64,10 +64,10 @@ class Device(EmptyDevice):
         # remains here for compatibility with v1.5.3
         self.multichannel = ["CH1", "CH2", "CH3", "CH4"]
 
-        self.variables = ["Voltage", "Current"]
-        self.units = ["V", "A"]
-        self.plottype = [True, True]  # True to plot data
-        self.savetype = [True, True]  # True to save data
+        self.variables = ["Voltage", "Current", "OVP", "OCP"]
+        self.units = ["V", "A", "", ""]
+        self.plottype = [True, True, True, True]  # True to plot data
+        self.savetype = [True, True, True, True]  # True to save data
 
         self.port_manager = True
         self.port_types = ["TCPIP", "GPIB"]
@@ -79,14 +79,14 @@ class Device(EmptyDevice):
             "Current [A]": "CURR",
         }
 
+        # voltage autorange supported only by N678x
         self.voltage_ranges = OrderedDict([
-            ("Auto", "MAX"),
             ("51V", "51"),
             ("5.5V", "5.5")
         ])
 
+        # current autorange supported only by N678x
         self.current_ranges = OrderedDict([
-            ("Auto", "MAX"),
             ("3.06A", "3.06"),
             ("100 mA", "0.1"),
             ("200 uA", "0.0002"),
@@ -100,7 +100,11 @@ class Device(EmptyDevice):
             "RangeVoltage": list(self.voltage_ranges.keys()),
             "Compliance": 100e-6,
             "4wire": False,
-            "Average": 1
+            "Speed": ["Medium", "Fast", "Slow"],
+            "CheckPulse": False,
+            "PulseOnTime": 0.5,
+            "PulseOffTime": 0.5,
+            "PulseOffLevel": 0.0,
         }
 
         return GUIparameter
@@ -110,8 +114,13 @@ class Device(EmptyDevice):
         self.protection = parameter['Compliance']
         self.vrange = self.voltage_ranges[parameter["RangeVoltage"]]
         self.irange = self.current_ranges[parameter["Range"]]
-        self.average = parameter["Average"]
         self.four_wires = parameter["4wire"]
+        self.speed = parameter["Speed"]
+
+        self.pulse = parameter['CheckPulse']  
+        self.ton = float(parameter["PulseOnTime"])
+        self.toff = float(parameter["PulseOffTime"])
+        self.pulseofflevel = parameter['PulseOffLevel']
 
         self.device = parameter['Device']
         self.channel = self.device[-1]
@@ -129,23 +138,36 @@ class Device(EmptyDevice):
 
         if self.source == "Voltage [V]":
             # 4 wires
-            debug(self.four_wires)
             if self.four_wires:
                 self.port.write(f"VOLT:SENSE:SOURCE EXT, (@{self.channel})")
             else:
                 self.port.write(f"VOLT:SENSE:SOURCE INT, (@{self.channel})")
             # sourcemode fix
             self.port.write(f"VOLT:MODE FIX, (@{self.channel})")
+            #
+            # voltage protection (OVP) level
+            # VOLT:PROT value, (@ch)
+            #
             # compliance
             if self.channel_model.startswith('N678'):
                 self.port.write(
                     f"CURR:LIMIT {self.protection}, (@{self.channel})")
             else:
                 self.port.write(f"CURR {self.protection}, (@{self.channel})")
+                self.port.write(f"CURR:PROT:STAT ON, (@{self.channel})")
+            # pulse
+            if self.pulse == True:
+                self.pulsemode = "VOLTAGE"
 
         if self.source == "Current [A]":
             # sourcemode fix
             self.port.write(f"CURR:MODE FIX, (@{self.channel})")
+            #
+            # current protection (OCP) level
+            # CURR:LIMIT value, (@ch)   (N678x)
+            # CURR value, (@ch)         (other)
+            # CURR:PROT:STAT ON, (@ch)
+            #
             # compliance
             if self.channel_model.startswith('N678'):
                 self.port.write(
@@ -153,49 +175,74 @@ class Device(EmptyDevice):
             else:
                 self.port.write(
                     f"VOLT:PROT {self.protection}, (@{self.channel})")
+            # pulse
+            if self.pulse == True:
+                self.pulsemode = "CURRENT"
+
+        # pulse
+        if self.pulse == True:
+            self.port.write(f"{self.pulsemode}:MODE ARB, (@{self.channel})")
+            self.port.write(f"ARB:FUNC:SHAPE PULSE, (@{self.channel})")
+            self.port.write(f"ARB:FUNC:TYPE {self.pulsemode}, (@{self.channel})")
+            self.port.write(f"ARB:COUNT INF, (@{self.channel})")
 
         self.port.write(f"SENSE:VOLT:RANGE {self.vrange}, (@{self.channel})")
         self.port.write(f"SENSE:CURR:RANGE {self.irange}, (@{self.channel})")
+        
 
-        self.port.write(
-            f"SENSE:SWEEP:POINTS {self.average}, (@{self.channel})")
+        self.npoints = 3906;        # 50 Hz power line  (= medium)
+        #self.npoints = 3255;        # 60 Hz power line (= medium)
 
-    def deinitialize(self):
-        pass
+        if self.speed == "Fast":
+            # 0.1 NPLC
+            self.npoints = int(self.npoints/10)
+        elif self.speed == "Slow":
+            # 10 NPLC
+            self.npoints *= 10
+
+        self.port.write(f"SENSE:SWEEP:POINTS {self.npoints}, (@{self.channel})")
 
     def poweron(self):
-        self.port.write(f"OUTP ON, (@{self.channel})")
+        if self.pulse == True:
+            self.port.write(f"ARB:COUNT INF, (@{self.channel})")
+            self.port.write(f"TRIG:ARB:SOURCE IMM")
+            self.port.write(f"OUTP ON, (@{self.channel})")
+            self.port.write(f"INIT:TRAN (@{self.channel})")
+        else:
+            self.port.write(f"OUTP ON, (@{self.channel})")
 
     def poweroff(self):
         self.port.write(f"OUTP OFF, (@{self.channel})")
+        if self.pulse == True:
+            self.port.write(f"ABORT:TRAN (@{self.channel})")
 
     def apply(self):
-        self.port.write(
-            f"{self.commands[self.source]} {self.value}, (@{self.channel})")
-
-    def trigger(self):
-        pass
-
-    def measure(self):
-        pass
+        # pulse
+        if self.pulse == True:
+            self.port.write(f"ABORT:TRAN (@{self.channel}); *WAI")  # wait for pending abort                       
+            self.port.write(f"ARB:{self.pulsemode}:PULSE:START:TIME {float(self.toff/2)}, (@{self.channel})")
+            self.port.write(f"ARB:{self.pulsemode}:PULSE:START:LEVEL {self.pulseofflevel}, (@{self.channel})")
+            self.port.write(f"ARB:{self.pulsemode}:PULSE:TOP:TIME {self.ton}, (@{self.channel})")
+            self.port.write(f"ARB:{self.pulsemode}:PULSE:TOP:LEVEL {self.value}, (@{self.channel})")
+            self.port.write(f"ARB:{self.pulsemode}:PULSE:END:TIME {float(self.toff)/2}, (@{self.channel})")
+            self.port.write(f"INIT:TRAN (@{self.channel})")
+        else:
+            self.port.write(f"{self.commands[self.source]} {self.value}, (@{self.channel})")
 
     def call(self):
-        self.port.write(f"MEAS:ARR:VOLT? (@{self.channel})")
-        str = self.port.read()
-        voltage_array = np.array([float(v) for v in str.split(',')])
-        voltage = np.average(voltage_array)
+        self.port.write(f"MEAS:VOLT? (@{self.channel})")
+        voltage = float(self.port.read())
 
         # modules N6761A and N6762A have simultaneous V/I measurement
         if self.channel_model.startswith('N676'):
-            self.port.write(f"FETCH:ARR:CURR? (@{self.channel})")
+            self.port.write(f"FETCH:CURR? (@{self.channel})")
         else:
-            self.port.write(f"MEAS:ARR:CURR? (@{self.channel})")
+            self.port.write(f"MEAS:CURR? (@{self.channel})")
 
-        str = self.port.read()
-        current_array = np.array([float(v) for v in str.split(',')])
-        current = np.average(current_array)
+        current = float(self.port.read())
 
-        return [voltage, current]
-
-    def finish(self):
-        pass
+        # check questionable status condition register
+        self.port.write(f"STAT:QUES:COND? (@{self.channel})")
+        regvalue = int(self.port.read())
+        
+        return [voltage, current, bool(regvalue & (1)), bool(regvalue & (1<<1))]
