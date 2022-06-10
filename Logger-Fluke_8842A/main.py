@@ -5,7 +5,7 @@
 #
 # MIT License
 #
-# Copyright (c) 2022 Gennaro Tortone (gtortone@gmail.com)
+# Copyright (c) 2022 Gennaro Tortone (Istituto Nazionale di Fisica Nucleare - Sezione di Napoli - tortone@na.infn.it)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
