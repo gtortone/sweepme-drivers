@@ -27,7 +27,7 @@
 
 # SweepMe! device class
 # Type: Signal
-# Device: Agilent N6705A
+# Device: Keysight N6705
 
 from multiprocessing.context import set_spawning_popen
 from EmptyDeviceClass import EmptyDevice
