@@ -32,11 +32,16 @@
 
 # Relation between trigger mode and burst parameters
 #
-# Trigger		        Signal period   Signal repetitions  Burst delay		Output
+# example: 
+# - period: 2s
+# - signal repetitions: 3
+# - burst delay: 8s 
+#
+# Trigger           Output
 # --------------------------------------------------------------------------------
-# Internal (INT)		           2s				     3	        8s	    offset/lolevel for 8s at start, loop [ 3 signal (6s), offset/lolevel (2s) ]
-# External (EXT)		           2s	                 3          8s      offset/lolevel up to trigger, @trigger: 3 signal (6s), offset/lolevel (2s) - no repetitions, no delay
-# Bus	   (BUS)	               2s				     3		    8s	    3 signal (6s), offset/lolevel up to next sweep value (apply method)
+# Internal (INT)    offset/lolevel for 8s at start, loop [ 3 signal (6s), offset/lolevel (2s) ]
+# External (EXT)    offset/lolevel up to trigger, @trigger: 3 signal (6s), offset/lolevel (2s) - no repetitions, no delay
+# Bus	   (BUS)    signal (6s), offset/lolevel up to next sweep value (apply method)
 
 from EmptyDeviceClass import EmptyDevice
 from ErrorMessage import debug
@@ -97,6 +102,7 @@ class Device(EmptyDevice):
         self.waveforms['Pulse'][self.AMPLITUDE] = dict({"command": "VOLT", "unit": "V"})
         self.waveforms['Pulse'][self.OFFSET] = dict({"command": "VOLT:OFFS", "unit": "V"})
         self.waveforms['Pulse'][self.PULSEWIDTH] = dict({"command": "PULSE:WIDTH", "unit": "s"})
+        self.waveforms['Pulse'][self.RISETIME] = dict({"command": "FUNC:PULSE:TRANS", "unit": "s"})
         # Noise
         self.waveforms['Noise'] = dict()
         self.waveforms['Noise']['label'] = "NOIS"
@@ -390,7 +396,8 @@ class Device(EmptyDevice):
             # pulsewidth = dutycycle / 100 * period
             self.pulsewidth = self.dutycyclepulsewidthvalue / 100 * params[self.PERIOD]
 
-        # edge time for rising and falling edges is 5 ns by default
+        # edge time for rising and falling edges is 5 ns by default (max 100 ns)
+        params.update({self.RISETIME: self.risetime})
         params.update({self.PULSEWIDTH: self.pulsewidth})
 
         return params
@@ -401,6 +408,7 @@ class Device(EmptyDevice):
         self.set_parameter(self.AMPLITUDE, params[self.AMPLITUDE])
         self.set_parameter(self.OFFSET, params[self.OFFSET])
         self.set_parameter(self.PULSEWIDTH, params[self.PULSEWIDTH])
+        self.set_parameter(self.RISETIME, params[self.RISETIME])
 
     # NOISE
 
