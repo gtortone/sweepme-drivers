@@ -29,17 +29,14 @@
 # Type: Signal
 # Device: Keysight N6705
 
-from multiprocessing.context import set_spawning_popen
 from EmptyDeviceClass import EmptyDevice
 from ErrorMessage import debug
 
 
 class Device(EmptyDevice):
-    
-    multichannel = ["CH1", "CH2", "CH3", "CH4"]
 
     description =   """
-                        Agilent N6705A
+                        Keysight N6705
                         DC power analyzer
                     """
 
@@ -47,18 +44,15 @@ class Device(EmptyDevice):
 
         EmptyDevice.__init__(self)
 
-        # remains here for compatibility with v1.5.3
-        self.multichannel = ["CH1", "CH2", "CH3", "CH4"]
-
         self.port_manager = True
         self.port_types = ["TCPIP", "GPIB"]
 
         self.PERIOD = "Period in s"
         self.FREQUENCY = "Frequency in Hz"
         self.AMPLITUDE = "Amplitude in V"
-        self.HILEVEL = "HiLevel in V"
+        self.HILEVEL = "High level in V"
         self.OFFSET = "Offset in V"
-        self.LOLEVEL = "LoLevel in V"
+        self.LOLEVEL = "Low level in V"
         self.PHASE = "Phase in deg"
         self.DELAY = "Delay in s"
         self.DUTYCYCLE = "Duty cycle in %"
@@ -132,6 +126,7 @@ class Device(EmptyDevice):
         GUIparameter = {
             "SweepMode": [self.PERIOD, self.FREQUENCY, self.AMPLITUDE, self.HILEVEL, self.OFFSET,  self.LOLEVEL, self.PHASE, \
                 self.DELAY, self.DUTYCYCLE, self.PULSEWIDTH, self.RISETIME, self.FALLTIME, self.NSTEPS,  self.TCONSTANT, "None"],
+            "Channel": ["1", "2", "3", "4"],
             "Waveform": list(self.waveforms.keys()),
             "PeriodFrequency": [self.PERIOD, self.FREQUENCY],
             "AmplitudeHiLevel": [self.AMPLITUDE, self.HILEVEL],
@@ -167,8 +162,8 @@ class Device(EmptyDevice):
         self.falltime                 = float(parameter['FallTime'])
 
         self.device = parameter['Device']
-        self.channel = self.device[-1]
-        self.shortname = "AgilentN6705A CH" + self.channel
+        self.channel = parameter['Channel']
+        self.shortname = "Keysight N6705 CH" + self.channel
 
         self.variables = ['Voltage in V', 'Current in A']
         self.units = ['V', 'A']
@@ -447,4 +442,3 @@ class Device(EmptyDevice):
         self.set_parameter(self.RISETIME, params[self.RISETIME])
         self.set_parameter(self.HILEVEL, params[self.HILEVEL])
         self.set_parameter(self.TCONSTANT, params[self.TCONSTANT])
-
