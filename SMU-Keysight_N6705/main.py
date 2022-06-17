@@ -29,7 +29,6 @@
 # Type: SMU
 # Device: Keysight N6705
 
-import numpy as np
 from collections import OrderedDict
 from EmptyDeviceClass import EmptyDevice
 from ErrorMessage import debug
@@ -38,31 +37,26 @@ from ErrorMessage import debug
 class Device(EmptyDevice):
 
     description = """
-                        Agilent N6705A
+                        Keysight N6705
                         DC power analyzer
                         
-                        Agilent N7605A can be equipped with different modules/options that enable different features.
+                        Keysight N6705 can be equipped with different modules/options that enable different features.
                         
                         - N678x modules:
                             - voltage compliance is monitored sensing 4-wire terminals
                             
                         - Opt 1A option:
-                            - 100 uA measurement range
+                            - 100 µA measurement range
                             
                         - Opt 2A option:
-                            - 200 uA measurement range
+                            - 200 µA measurement range
                     """
-
-    multichannel = ["CH1", "CH2", "CH3", "CH4"]
 
     def __init__(self):
 
         EmptyDevice.__init__(self)
 
-        self.shortname = "Agilent N6705A"
-
-        # remains here for compatibility with v1.5.3
-        self.multichannel = ["CH1", "CH2", "CH3", "CH4"]
+        self.shortname = "Keysight N6705"
 
         self.variables = ["Voltage", "Current", "OVP", "OCP"]
         self.units = ["V", "A", "", ""]
@@ -75,39 +69,40 @@ class Device(EmptyDevice):
         self.channel_model = None
 
         self.commands = {
-            "Voltage [V]": "VOLT",
-            "Current [A]": "CURR",
+            "Voltage in V": "VOLT",
+            "Current in A": "CURR",
         }
 
         # voltage autorange supported only by N678x
         self.voltage_ranges = OrderedDict([
-            ("51V", "51"),
-            ("5.5V", "5.5")
+            ("51 V", "51"),
+            ("5.5 V", "5.5")
         ])
 
         # current autorange supported only by N678x
         self.current_ranges = OrderedDict([
-            ("3.06A", "3.06"),
+            ("3.06 A", "3.06"),
             ("100 mA", "0.1"),
-            ("200 uA", "0.0002"),
-            ("100 uA", "0.0001")
+            ("200 µA", "0.0002"),
+            ("100 µA", "0.0001")
         ])
 
     def set_GUIparameter(self):
-        GUIparameter = {
-            "SweepMode": ["Voltage [V]", "Current [A]"],
+        gui_parameter = {
+            "SweepMode": ["Voltage in V", "Current A"],
+            "Channel": ["1", "2", "3", "4"],
             "Range": list(self.current_ranges.keys()),
             "RangeVoltage": list(self.voltage_ranges.keys()),
             "Compliance": 100e-6,
             "4wire": False,
-            "Speed": ["Medium", "Fast", "Slow"],
+            "Speed": ["Fast", "Medium", "Slow"],
             "CheckPulse": False,
             "PulseOnTime": 0.5,
             "PulseOffTime": 0.5,
             "PulseOffLevel": 0.0,
         }
 
-        return GUIparameter
+        return gui_parameter
 
     def get_GUIparameter(self, parameter={}):
         self.source = parameter['SweepMode']
@@ -123,7 +118,7 @@ class Device(EmptyDevice):
         self.pulseofflevel = parameter['PulseOffLevel']
 
         self.device = parameter['Device']
-        self.channel = self.device[-1]
+        self.channel = parameter['Channel']
 
     def initialize(self):
         self.port.port.read_termination = '\n'
@@ -136,7 +131,7 @@ class Device(EmptyDevice):
         self.port.write(f"SYST:CHAN:MODEL? (@{self.channel})")
         self.channel_model = self.port.read()
 
-        if self.source == "Voltage [V]":
+        if self.source.startswith("Voltage"):
             # 4 wires
             if self.four_wires:
                 self.port.write(f"VOLT:SENSE:SOURCE EXT, (@{self.channel})")
@@ -156,10 +151,10 @@ class Device(EmptyDevice):
                 self.port.write(f"CURR {self.protection}, (@{self.channel})")
                 self.port.write(f"CURR:PROT:STAT ON, (@{self.channel})")
             # pulse
-            if self.pulse == True:
+            if self.pulse:
                 self.pulsemode = "VOLTAGE"
 
-        if self.source == "Current [A]":
+        elif self.source.startswith("Current"):
             # sourcemode fix
             self.port.write(f"CURR:MODE FIX, (@{self.channel})")
             #
@@ -176,11 +171,11 @@ class Device(EmptyDevice):
                 self.port.write(
                     f"VOLT:PROT {self.protection}, (@{self.channel})")
             # pulse
-            if self.pulse == True:
+            if self.pulse:
                 self.pulsemode = "CURRENT"
 
         # pulse
-        if self.pulse == True:
+        if self.pulse:
             self.port.write(f"{self.pulsemode}:MODE ARB, (@{self.channel})")
             self.port.write(f"ARB:FUNC:SHAPE PULSE, (@{self.channel})")
             self.port.write(f"ARB:FUNC:TYPE {self.pulsemode}, (@{self.channel})")
@@ -188,10 +183,9 @@ class Device(EmptyDevice):
 
         self.port.write(f"SENSE:VOLT:RANGE {self.vrange}, (@{self.channel})")
         self.port.write(f"SENSE:CURR:RANGE {self.irange}, (@{self.channel})")
-        
 
-        self.npoints = 3906;        # 50 Hz power line  (= medium)
-        #self.npoints = 3255;        # 60 Hz power line (= medium)
+        self.npoints = 3906        # 50 Hz power line  (= medium)
+        # self.npoints = 3255        # 60 Hz power line (= medium)
 
         if self.speed == "Fast":
             # 0.1 NPLC
@@ -203,7 +197,7 @@ class Device(EmptyDevice):
         self.port.write(f"SENSE:SWEEP:POINTS {self.npoints}, (@{self.channel})")
 
     def poweron(self):
-        if self.pulse == True:
+        if self.pulse:
             self.port.write(f"ARB:COUNT INF, (@{self.channel})")
             self.port.write(f"TRIG:ARB:SOURCE IMM")
             self.port.write(f"OUTP ON, (@{self.channel})")
@@ -213,12 +207,12 @@ class Device(EmptyDevice):
 
     def poweroff(self):
         self.port.write(f"OUTP OFF, (@{self.channel})")
-        if self.pulse == True:
+        if self.pulse:
             self.port.write(f"ABORT:TRAN (@{self.channel})")
 
     def apply(self):
         # pulse
-        if self.pulse == True:
+        if self.pulse:
             self.port.write(f"ABORT:TRAN (@{self.channel}); *WAI")  # wait for pending abort                       
             self.port.write(f"ARB:{self.pulsemode}:PULSE:START:TIME {float(self.toff/2)}, (@{self.channel})")
             self.port.write(f"ARB:{self.pulsemode}:PULSE:START:LEVEL {self.pulseofflevel}, (@{self.channel})")
