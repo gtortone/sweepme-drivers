@@ -53,11 +53,9 @@ class Device(EmptyDevice):
     
         EmptyDevice.__init__(self)
         
-        self.idlevalue = None
-        
         self.port_manager = True
         self.port_types = ['USB', 'GPIB']
-        self.port_identifications = ['Agilent Technologies,33220A']
+        #self.port_identifications = ['Agilent Technologies,33220A']
 
         self.PERIOD = "Period in s"
         self.FREQUENCY = "Frequency in Hz"
