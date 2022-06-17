@@ -5,7 +5,7 @@
 #
 # MIT License
 #
-# Copyright (c) 2022 Gennaro Tortone (Istituto Nazionale di Fisica Nucleare - Sezione di Napoli - tortone@na.infn.it)
+# Copyright (c) 2022 Gennaro Tortone (gtortone@gmail.com)
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -103,7 +103,7 @@ function.
         self.shortname = "NF-CA5351"    # short name will be shown in the sequencer
 
         self.port_manager = True
-        self.port_types = ["TCPIP", "GPIB"]
+        self.port_types = ["TCPIP", "GPIB", "COM"]
 
         self.inputs = {
             "front": "FRONT",
@@ -111,7 +111,7 @@ function.
         }
 
         self.cs_ranges = OrderedDict([          # current suppression (CS) range
-            ("auto", 0),
+            ("Auto", 0),
             ("8 nA", 8E-9),
             ("80 nA", 80E-9),
             ("800 nA", 800E-9),
@@ -122,8 +122,8 @@ function.
         ])
 
         self.filter_rtimes = OrderedDict([      # filter rise time
-            ("auto", 0),
-            ("1 us", 1E-6),
+            ("Auto", 0),
+            ("1 μs", 1E-6),
             ("3 μs", 3E-6),
             ("10 μs", 10E-6),
             ("30 μs", 30E-6),
@@ -145,7 +145,7 @@ function.
             "1E07": 5,
             "1E08": 6,
             "1E09": 7,
-            "1E010": 8
+            "1E10": 8
         }
 
 
@@ -188,7 +188,7 @@ function.
         self.plottype = []
         self.savetype = []
 
-        if self.cs_enable and self.cs_range == "auto":
+        if self.cs_enable and self.cs_range == "Auto":
             self.variables.append("Current suppression")
             self.units.append("A")
             self.plottype.append(True)
@@ -199,15 +199,13 @@ function.
             self.plottype.append(True)
             self.savetype.append(True)
 
-        if self.filter_enable and self.filter_rtime == "auto":
+        if self.filter_enable and self.filter_rtime == "Auto":
             self.variables.append("Filter rise time")
             self.units.append("s")
             self.plottype.append(True)
             self.savetype.append(True)
         
     def initialize(self):
-        self.port.port.read_termination = '\n'
-        self.port.port.write_termination = '\n'
         self.port.write("*RST") # reset to default settings
 
     def configure(self):
@@ -219,9 +217,9 @@ function.
         self.port.write(f":ROUTE:TERMINALS {self.input}")
 
         if self.zero_check:
-            self.port.write(f":INPUT:STATE ON")
+            self.port.write(":INPUT:STATE ON")
         else:
-            self.port.write(f":INPUT:STATE OFF")
+            self.port.write(":INPUT:STATE OFF")
 
         if self.cs_enable:
 
@@ -229,7 +227,7 @@ function.
             self.port.write("*CLS")
             if self.auto_settings is False:
                 # set range
-                if self.cs_range == "auto":
+                if self.cs_range == "Auto":
                     self.port.write(":INPUT:BIAS:CURRENT:RANGE:AUTO ON")
                 else:
                     self.port.write(f":INPUT:BIAS:CURRENT:RANGE {list(self.cs_ranges.keys()).index(self.cs_range)}")
@@ -241,7 +239,8 @@ function.
                 telapsed = 0
                 completed = False
                 while telapsed < timeout:
-                    if int(self.port.port.query("*OPC?")) == 1:
+                    self.port.write("*OPC?")
+                    if int(self.port.read()) == 1:
                         completed = True
                         break
                     time.sleep(0.5)
@@ -263,7 +262,7 @@ function.
 
         # set filter
         if self.filter_enable:
-            if self.filter_rtime == "auto":
+            if self.filter_rtime == "Auto":
                 self.port.write(":INPUT:FILTER:TIME:AUTO ON")
             else:
                 self.port.write(f":INPUT:FILTER:TIME {list(self.filter_rtimes.keys()).index(self.filter_rtime)}")
@@ -272,12 +271,15 @@ function.
 
     def call(self):
         retarr = []
-        if (self.cs_enable and self.cs_range == "auto"):
-            retarr.append(float(self.port.port.query(":INPUT:BIAS:CURRENT?")))
-            id = int(self.port.port.query(":INPUT:BIAS:CURRENT:RANGE?"))
+        if (self.cs_enable and self.cs_range == "Auto"):
+            self.port.write(":INPUT:BIAS:CURRENT?")
+            retarr.append(float(self.port.read()))
+            self.port.write(":INPUT:BIAS:CURRENT:RANGE?")
+            id = int(self.port.read())
             retarr.append(list(self.cs_ranges.items())[id][1])
-        if self.filter_enable and self.filter_rtime == "auto":
-            id = int(self.port.port.query(":INPUT:FILTER:TIME?"))
+        if self.filter_enable and self.filter_rtime == "Auto":
+            self.port.write(":INPUT:FILTER:TIME?")
+            id = int(self.port.read())
             retarr.append(list(self.filter_rtimes.items())[id][1])
             
         return retarr
