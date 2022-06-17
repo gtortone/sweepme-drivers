@@ -106,8 +106,8 @@ function.
         self.port_types = ["TCPIP", "GPIB", "COM"]
 
         self.inputs = {
-            "front": "FRONT",
-            "rear": "REAR"
+            "Front": "FRONT",
+            "Rear": "REAR"
         }
 
         self.cs_ranges = OrderedDict([          # current suppression (CS) range
