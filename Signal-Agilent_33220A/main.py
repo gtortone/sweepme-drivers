@@ -161,10 +161,10 @@ class Device(EmptyDevice):
         self.dutycyclepulsewidthvalue    = float(parameter['DutyCyclePulseWidthValue'])
         self.risetime                    = float(parameter['RiseTime'])
         #self.delayphase                 = parameter['DelayPhase']
+        self.operation_mode              = parameter['OperationMode']
         self.impedance                   = parameter['Impedance']
         self.trigger_mode                = parameter['Trigger']
         self.waveform_file               = parameter['ArbitraryWaveformFile']
-        self.burst_enabled               = parameter['BurstShowHide']
         self.burst_signals               = int(parameter['BurstSignalRepetitions'])
         self.burst_period                = float(parameter['BurstDelay'])
         
@@ -194,6 +194,7 @@ class Device(EmptyDevice):
                         #"DelayPhaseValue": 0,
                         "DutyCyclePulseWidthValue": 1,
                         self.RISETIME: 1,
+                        "OperationMode": ["Continuous", "Burst"],
                         "Impedance": ["High-Z", "50 Ohm"],
                         "Trigger": ["Internal", "External", "Bus"], 
                         "ArbitraryWaveformFile": "",
@@ -215,7 +216,7 @@ class Device(EmptyDevice):
         if self.impedance == "50 Ohm":
             self.port.write("OUTP:LOAD 50")
 
-        if self.burst_enabled:
+        if self.operation_mode == "Burst":
             self.port.write("BURST:STATE ON")
             self.port.write(f"BURST:NCYCLES {self.burst_signals}")
             # burst delay > period * signal repetitions
